@@ -1,5 +1,5 @@
 # Challenge 03 - Craft and deploy your first Manifest file
-## Estimated time to complete: 30 minutes
+## Estimated time to complete: 15 minutes
 
 ## Directions
 1. Craft a pod.yaml file that includes a Pod
