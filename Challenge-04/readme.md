@@ -12,3 +12,4 @@
 1. What are the names of the Pods? Why?
 2. What happens if you delete a Pod?
 3. Is there any other way to create a ReplicaSet?
+4. What would happen if you deploy a Pod with the same label?
