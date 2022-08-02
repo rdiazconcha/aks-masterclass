@@ -1,5 +1,5 @@
 # Challenge 01 - Deploy an AKS cluster
-## Estimated time to complete: 20 minutes
+## Estimated time to complete: 15-20 minutes
 
 ## Directions
 1. Deploy an AKS cluster by using the Azure CLI (`az aks create`).
