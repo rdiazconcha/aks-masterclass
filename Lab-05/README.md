@@ -1,124 +1,111 @@
-# Lab 05 - A bigger site
-## Estimated time to complete: 30 minutes
+# Lab 05 - Rolling Updates
+## Estimated time to complete: 20 minutes
 
-Welcome to the deep end of the pool.  :D  We're going to take the site from the previous course (Lab 05), and get it running on Kubernetes.
+Let's imagine we need to update the front-end site with zero down-time.
 
-Here's your challenge: build the deployment.yaml and service.yaml for both frontend and backend so they can communicate.
-
-Here's a network diagram of the application we'll build:
-
-![A Bigger Site Architecture](architecture.png)
-
-1. We connect to http://localhost:32xxx, the nodePort of frontend service.
-2. Kubernetes automatically proxies this across the Kubernetes "router" to the LAN side.
-3. frontend service load balances across all instances of frontend pod created by frontend deployment.
-4. frontend service connects to a chosen frontend pod on port 3000.
-5. frontend pod connects to http://backend:5000/
-6. Because backend service is named `backend`, the backend service receives this request.
-7. backend service load balances across the 1 instance of backend pod created by backend deployment.
-8. backend service connects to backend pod on port 5000.
-9. backend pod processes the request, and replies.
-10. Traffic flows back through all the steps.
-11. The browser renders the page.
-
-When working locally, we'll skip the Ingress step because Ingress doesn't work well with Docker Desktop and Minikube.  We'll use Ingress when we get to cloud-hosted Kubernetes.
+A new requirement has come in.  Instead of "Votes", they want the site to say "Likes".
 
 
-Step 0: Build the Images
+Step 1: Modify the code
 ------------------------
 
-For this exercise, we're going to be using the `frontend:0.1` and `backend:0.1` images built in the previous course (Lab 05).  If you don't have them you can use `rdiazconcha/frontend:0.1` and `rdiazconcha/backend:0.1`
+1. In the code for exercise Lab 05, open the file `src/frontend/views/index.hbs` in a text editor.
 
-Frontend
---------
+2. Change the word "Votes" to "Likes".
 
-1. Create a frontend folder.
-
-2. Copy the `deployment.yaml` from Lab 10, and the `service.yaml` from Lab 11 into this frontend folder.
-
-   **Bonus:** Don't copy/paste, but rather retype these files to build muscle memory and familiarity with the file formats.
-
-3. Open up `deployment.yaml`.
-
-4. Modify it to reference the `image: frontend:0.1`.
-
-5. Change other references from `hellonode` to `frontend`.
-
-6. Open up `service.yaml`.
-
-7. Change the name from `name: hellonode-service` to `name: frontend`
-
-   This will become the DNS name for this service to other pods in the cluster.
-
-8. Change references from `hellonode` to `frontend`.
+3. Save the file.
 
 
-Backend
--------
+Step 2: Build the new image
+---------------------------
 
-1. Create a backend folder.
+1. Open a terminal into Lab 05's frontend folder.
 
-2. Copy the `deployment.yaml` and `service.yaml` from the Frontend steps above into the `backend` folder.
+2. Run this build command:
 
-   **Bonus:** Don't copy/paste, but rather retype these files to build muscle memory and familiarity with the file formats.
+   ```
+   docker build --tag [REPOSITORY]/frontend:0.2 .
+   ```
+   > Replace [REPOSITORY] with your Docker Hub repository name.
 
-3. Modify the `backend` folder's `service.yaml` and `deployment.yaml` from port 3000 to port 5000.
+   This makes the new image version 0.2
 
-4. Modify the `backend` folder's `deployment.yaml` to specify `replicas: 1`.
+3. Push the image to your Docker Hub repository.
+   ```
+   docker push [REPOSITORY]/frontend:0.2
+   ```
 
-   **Note:** The code has a static list of all the votes (pretending to be a database), so we only want one of them.  If we were doing this for real, we'd store this data in an external database, and ramp the backend replicas up to at least 3 for high availability.
+Step 3: Update the deployment
+-----------------------------
 
-5. Modify other references in both backend files, renaming everything from `frontend` to `backend`.
+1. In the code for exercise Lab 05, open the file `frontend/deployment.yaml` in a text editor.
 
-6. In `service.yaml`, rename `backend-service` to `backend`.
-
-   The service name is the DNS entry for other pods to consume.  In `frontend`'s source code in `routes/index.js` it specifies `http://backend:5000`.  The frontend is able to resolve this URL to the backend because the backend service is named `backend`.
+2. Change both references in frontend's deployment.yaml from ~~`0.1`~~ to `0.2`.
 
 
-Schedule all the things
+Step 4: DevOps Pipeline
 -----------------------
 
-1. Open a terminal in the **backend** folder, and run this command:
+Here's where you'd commit these changes to source control, push them to the server, let the build server create the new images, and push them to your container registry of choice.  Let's assume that worked, and continue on.
 
-   ```
-   kubectl apply -f service.yaml
-   ```
 
-   Note: we'll be using Kubernetes's DNS service to discover the backend service, so the backend service must exist before we schedule the frontend deployment to create these DNS entries.
+Step 5: Schedule the new content
+--------------------------------
 
-2. Schedule the backend deployment:
+1. Open a terminal into exercise 10's frontend folder.
 
-   ```
-   kubectl apply -f deployment.yaml
-   ```
-
-3. `cd` into the **frontend** folder, and run these commands:
+2. Run this command:
 
    ```
    kubectl apply -f deployment.yaml
-   kubectl apply -f service.yaml
    ```
 
-4. Check on all the things:
+   `kubectl apply` is either a create or an update depending on if the content already exists.
+
+3. Run this:
 
    ```
    kubectl get all
    ```
 
-   Are all the pods, services, and deployments running?
+   If you're really fast, you can see a new pod getting created, then the old pod terminating, then another new pod getting created, then the last old pod terminating.
+
+4. Refresh the frontend website.  Nope, it never went down.
+
+5. `describe` some of the pods, deployments, and services and see what changed.
 
 
-Visit the site
---------------
+Step 6: Rollback
+----------------
 
-1. Let's get the `NodePort` that K8s automatically assigned to the frontend service
+Aaah!  Someone wasn't ready.  "Roll it back!"
+
+1. From a terminal, run:
 
    ```
-   kubectl get svc
+   kubectl rollout undo deployment/frontend-deployment
    ```
 
-   Note the `NodePort` (the 30,000 range port) for the `frontend`.
+2. Use `kubectl get all` to watch the rolling deployment put the old image version back into fresh pods.
 
-2. Browse to `http://localhost:NODE_PORT/` substituting the `NodePort` you found above.  My service was on port `30123` so I'll browse to `http://localhost:30123/`.
+   Can we get the old pods back?  Nope.  They're ephemeral -- they really got deleted.
 
-Success!  We're using microservices in Kubernetes!
+3. Refresh the front-end website.  It now says "Votes" again.
+
+Note:  If we undid again, we'd put 0.2 back.  Undo a third time and we'll be on 0.1.
+
+
+Step 7: Re-deploy
+-----------------
+
+So we're now ready.  Let's re-deploy version `0.2`.
+
+1. Run:
+
+   ```
+   kubectl apply -f deployment.yaml
+   ```
+
+2. Use `kubectl get all` to watch the rolling deployment create fresh pods with version `0.2`.
+
+3. Refresh the front-end website and see the new content.
